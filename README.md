@@ -14,6 +14,8 @@ A collection of Claude Code skills reverse-engineered from the internal source o
 | [skillify](.claude/skills/skillify.md) | `/skillify` | Capture this session's repeatable process as a reusable skill file |
 | [explore](.claude/skills/explore.md) | `/explore` | Deep read-only codebase exploration — parallel, structured report |
 | [plan](.claude/skills/plan.md) | `/plan` | Software architect agent — design an implementation plan before writing code |
+| [stuck](.claude/skills/stuck.md) | `/stuck` | Diagnose frozen/slow Claude Code sessions — CPU, memory, process state, child processes |
+| [remember](.claude/skills/remember.md) | `/remember` | Review auto-memory and propose promotions to CLAUDE.md / CLAUDE.local.md |
 
 ## Installation
 
@@ -34,7 +36,7 @@ curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.c
 ### One-liner (all skills at once)
 
 ```bash
-mkdir -p ~/.claude/skills && for skill in verify simplify batch security-review pr-comments skillify explore plan; do curl -s "https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/$skill.md" -o ~/.claude/skills/$skill.md; done
+mkdir -p ~/.claude/skills && for skill in verify simplify batch security-review pr-comments skillify explore plan stuck remember; do curl -s "https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/$skill.md" -o ~/.claude/skills/$skill.md; done
 ```
 
 ### Project-level (one project only)
