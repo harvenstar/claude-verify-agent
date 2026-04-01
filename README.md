@@ -1,85 +1,125 @@
 # claude-verify-agent
 
-An adversarial verification skill for Claude Code, reverse-engineered from the internal `verificationAgent.ts` found in the Claude Code source leak.
+A collection of Claude Code skills reverse-engineered from the internal source of Claude Code. Each skill is a markdown file you can drop into any project — no installation required beyond copying the file.
 
-## What This Is
+## Skills
 
-Claude Code ships with a built-in Verification Agent that is used internally when running sub-agents. Its design philosophy is unusual: instead of confirming that code works, it **tries to break it**.
-
-The source explicitly calls out two failure modes that most verification agents fall into:
-
-1. **Verification Avoidance** — reading code instead of running checks, then declaring PASS
-2. **Fooled by the First 80%** — the happy path works, tests pass, so you stop — missing the 20% of real failure cases
-
-This repo extracts that adversarial verification behavior as a standalone Claude Code skill you can invoke with `/verify`.
+| Skill | Invoke | Description |
+|-------|--------|-------------|
+| [verify](.claude/skills/verify.md) | `/verify` | Adversarial verification agent — tries to break your implementation, not confirm it |
+| [simplify](.claude/skills/simplify.md) | `/simplify` | 3 parallel code review agents: reuse, quality, efficiency |
+| [batch](.claude/skills/batch.md) | `/batch` | Orchestrate large parallelizable changes across a codebase in isolated worktrees |
+| [security-review](.claude/skills/security-review.md) | `/security-review` | 3-phase security review with false-positive filtering (>80% confidence threshold) |
+| [pr-comments](.claude/skills/pr-comments.md) | `/pr-comments` | Fetch and display all comments from the current branch's GitHub PR |
+| [skillify](.claude/skills/skillify.md) | `/skillify` | Capture this session's repeatable process as a reusable skill file |
+| [explore](.claude/skills/explore.md) | `/explore` | Deep read-only codebase exploration — parallel, structured report |
+| [plan](.claude/skills/plan.md) | `/plan` | Software architect agent — design an implementation plan before writing code |
 
 ## Installation
 
-### Option A: Project-level (one project)
-
-Copy the skill file into your project:
-
-```bash
-mkdir -p .claude/skills
-curl -o .claude/skills/verify.md \
-  https://raw.githubusercontent.com/YOUR_USERNAME/claude-verify-agent/main/.claude/skills/verify.md
-```
-
-### Option B: Global (all projects)
+### Global (available in all projects)
 
 ```bash
 mkdir -p ~/.claude/skills
-curl -o ~/.claude/skills/verify.md \
-  https://raw.githubusercontent.com/YOUR_USERNAME/claude-verify-agent/main/.claude/skills/verify.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/verify.md -o ~/.claude/skills/verify.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/simplify.md -o ~/.claude/skills/simplify.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/batch.md -o ~/.claude/skills/batch.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/security-review.md -o ~/.claude/skills/security-review.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/pr-comments.md -o ~/.claude/skills/pr-comments.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/skillify.md -o ~/.claude/skills/skillify.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/explore.md -o ~/.claude/skills/explore.md
+curl -s https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/plan.md -o ~/.claude/skills/plan.md
 ```
 
-Then restart Claude Code.
+### One-liner (all skills at once)
 
-## Usage
-
-After making changes, run:
-
-```
-/verify
+```bash
+mkdir -p ~/.claude/skills && for skill in verify simplify batch security-review pr-comments skillify explore plan; do curl -s "https://raw.githubusercontent.com/harvenstar/claude-verify-agent/main/.claude/skills/$skill.md" -o ~/.claude/skills/$skill.md; done
 ```
 
-Claude will:
-1. Run build, tests, and linter — and show you the actual output
-2. Run type-appropriate checks (frontend / backend / CLI / migrations)
-3. Run at least 3 adversarial probes targeting edge cases the implementation might have missed
-4. Output a final verdict:
+### Project-level (one project only)
 
-```
-VERDICT: PASS     — everything passed including adversarial probes
-VERDICT: FAIL     — specific failures with exact commands and outputs
-VERDICT: PARTIAL  — what passed, what didn't, what wasn't verified
+```bash
+mkdir -p .claude/skills
+# then curl individual skills as above, replacing ~/.claude with .claude
 ```
 
-## Why Adversarial?
+Restart Claude Code after installing.
 
-Standard verification asks: *does this work?*
-Adversarial verification asks: *how would this break?*
+## Skill Details
 
-The difference matters because the implementer already has confirmation bias — they built the thing, they tested the happy path, they believe it works. A verification agent that shares that bias adds no value.
+### `/verify` — Adversarial Verification
 
-The internal Claude Code verificationAgent is explicitly designed to counteract implementer bias by assuming the implementation is wrong until proven otherwise.
+Most verification agents confirm the happy path. This one tries to break your implementation.
 
-## What's Different From Just Asking Claude to Test
+Reconstructed from `src/tools/AgentTool/built-in/verificationAgent.ts`. The internal design calls out two failure modes it explicitly guards against:
+- **Verification Avoidance**: reading code and declaring PASS without running anything
+- **Fooled by First 80%**: happy path passes, so you stop
 
-When you ask Claude to "verify this works," it defaults to:
-- Reading the code
-- Running the obvious test
-- Saying it looks fine
+Every check must show exact command + exact output. Output is always one of:
+```
+VERDICT: PASS | FAIL | PARTIAL
+```
 
-The `/verify` skill forces a different posture:
-- Mandatory execution (no reading without running)
-- Adversarial probes are not optional
-- Every check must show exact command + exact output
-- PARTIAL is not a soft PASS
+---
+
+### `/simplify` — Code Review (3 Parallel Agents)
+
+Reconstructed from `src/skills/bundled/simplify.ts`. Launches three agents in parallel:
+1. **Code Reuse** — finds existing utilities that replace newly written code
+2. **Code Quality** — catches redundant state, copy-paste, stringly-typed patterns, unnecessary comments
+3. **Efficiency** — catches N+1 queries, missed concurrency, hot-path bloat, memory leaks
+
+---
+
+### `/batch` — Parallel Work Orchestration
+
+Reconstructed from `src/skills/bundled/batch.ts`. For large refactors:
+1. Decomposes work into 5–30 independent units
+2. Spawns worker agents in isolated git worktrees
+3. Each worker implements, tests, commits, and opens a PR
+4. Coordinator aggregates all PR URLs
+
+---
+
+### `/security-review` — Security Review
+
+Reconstructed from `src/commands/security-review.ts` (an internal Anthropic-only command moved to paid plugin). 3-phase methodology:
+1. Repository context research
+2. Comparative analysis against existing patterns
+3. Vulnerability assessment
+
+Only reports HIGH/MEDIUM findings with >80% confidence. 14 hard exclusions (DoS, rate limiting, outdated deps, etc.) to minimize false positives.
+
+---
+
+### `/pr-comments` — PR Comments
+
+Reconstructed from `src/commands/pr_comments/index.ts` (also moved to paid plugin). Fetches both PR-level and inline code review comments from the current branch's GitHub PR via the `gh` CLI. Displays them with diff context.
+
+---
+
+### `/skillify` — Session to Skill
+
+Reconstructed from `src/skills/bundled/skillify.ts`. Interviews you about the current session's repeatable process, then writes a `.claude/skills/<name>.md` file you can invoke later.
+
+---
+
+### `/explore` — Codebase Exploration
+
+Reconstructed from `src/tools/AgentTool/built-in/exploreAgent.ts`. Read-only, fully parallelized exploration. Returns a structured report: architecture, relevant files, key patterns, gotchas, suggested entry points.
+
+---
+
+### `/plan` — Implementation Planning
+
+Reconstructed from `src/tools/AgentTool/built-in/planAgent.ts`. Read-only software architect agent. Explores the codebase, designs an implementation plan, identifies critical files. Use this before `/batch` or complex features.
+
+---
 
 ## Source
 
-Behavior reconstructed from `src/tools/AgentTool/verificationAgent.ts` in the Claude Code npm package sourcemap (`cli.js.map`), which contained full `sourcesContent` for 4,756 source files.
+All skills reconstructed from `src/` in the Claude Code npm package sourcemap (`cli.js.map`), which contained full `sourcesContent` for 4,756 TypeScript source files.
 
 Original analysis: [claude-code-deep-dive](https://github.com/tvytlx/claude-code-deep-dive)
 
